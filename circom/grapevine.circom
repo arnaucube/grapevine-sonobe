@@ -17,10 +17,18 @@ template grapevine(num_felts) {
     signal input ivc_input[4];
     signal output ivc_output[4];
 
-    // private inputs
-    signal input phrase[num_felts]; // secret phrase, if first iteration
-    signal input usernames[2]; // prev username, current username
-    signal input auth_secrets[2]; // prev degree's user secret, current degree's user secret
+    // external inputs at each folding step
+    signal input external_inputs[num_felts+2+2];
+    signal phrase[num_felts]; // secret phrase, if first iteration
+    for (var i=0; i<num_felts; i++) {
+        phrase[i] <== external_inputs[i];
+    }
+    signal usernames[2]; // prev username, current username
+    usernames[0]<==external_inputs[num_felts];
+    usernames[1]<==external_inputs[num_felts+1];
+    signal auth_secrets[2]; // prev degree's user secret, current degree's user secret
+    auth_secrets[0]<==external_inputs[num_felts+2];
+    auth_secrets[1]<==external_inputs[num_felts+3];
 
     // name inputs from step_in
     signal degrees_of_separation <== ivc_input[0];

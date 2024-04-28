@@ -6,12 +6,9 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-ark-pallas = { version = "0.4.0", features = ["r1cs"] }
-ark-vesta = {version="0.4.0", features=["r1cs"]}
-ark-circom = { git = "https://github.com/arnaucube/circom-compat.git" }
+ark-bn254 = { version = "0.4.0", features = ["r1cs"] }
+ark-grumpkin = {version="0.4.0", features=["r1cs"]}
 ark-ec = "0.4.1"
 ark-ff = "0.4.1"
 ark-r1cs-std = { version = "0.4.0", default-features = false }
@@ -24,9 +21,16 @@ ark-crypto-primitives = { version = "^0.4.0", default-features = false, features
 ark-std = "0.4.0"
 color-eyre = "0.6.2"
 num-bigint = "0.4.3"
-sonobe = { git = "https://github.com/privacy-scaling-explorations/sonobe", package = "folding-schemes", branch = "main" }
+sonobe = { git = "https://github.com/privacy-scaling-explorations/sonobe", package = "folding-schemes", branch = "circom-external-inputs" }
 serde = "1.0.198"
 serde_json = "1.0.116"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
+
+[patch.crates-io]
+# patch ark_curves to use a cherry-picked version which contains
+# bn254::constraints & grumpkin for v0.4.0 (once arkworks v0.5.0 is released
+# this will no longer be needed)
+ark-bn254 = { git = "https://github.com/arnaucube/ark-curves-cherry-picked", branch="cherry-pick"}
+ark-grumpkin = { git = "https://github.com/arnaucube/ark-curves-cherry-picked", branch="cherry-pick"}
