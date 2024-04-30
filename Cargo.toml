@@ -27,6 +27,7 @@ serde_json = "1.0.116"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
+ark-circom = { git = "https://github.com/arnaucube/circom-compat.git" }
 
 [patch.crates-io]
 # patch ark_curves to use a cherry-picked version which contains

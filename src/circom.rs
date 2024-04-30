@@ -7,12 +7,12 @@ mod test {
     };
     use ark_bn254::{constraints::GVar, Fr, G1Projective as Projective};
     // use ark_circom::circom::CircomCircuit;
-    use ark_ff::PrimeField;
+    use ark_ff::{BigInteger, PrimeField};
     use ark_grumpkin::{constraints::GVar as GVar2, Projective as Projective2};
     use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, R1CSVar};
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
     use lazy_static::lazy_static;
-    use num_bigint::BigInt;
+    use num_bigint::{BigInt, Sign};
     use sonobe::{
         commitment::pedersen::Pedersen, folding::nova::Nova, frontend::circom::CircomFCircuit,
         transcript::poseidon::poseidon_test_config, Error, FoldingScheme,
@@ -42,6 +42,61 @@ mod test {
             .unwrap();
     }
 
+    // Converts a PrimeField element to a num_bigint::BigInt representation.
+    pub fn ark_primefield_to_num_bigint<F: PrimeField>(value: F) -> BigInt {
+        let primefield_bigint: F::BigInt = value.into_bigint();
+        let bytes = primefield_bigint.to_bytes_be();
+        BigInt::from_bytes_be(Sign::Plus, &bytes)
+    }
+
+    /// This test tests the circom circuit without using anything from Sonobe, just using
+    /// arkworks/circom-compat to check the Grapevine circuit.
+    #[test]
+    fn test_circom_circuit() {
+        // define inputs
+        let step_0_inputs = CircomPrivateInput {
+            phrase: Some(String::from(&*PHRASE)),
+            usernames: [None, Some(String::from(&*USERNAMES[0]))],
+            auth_secrets: [None, Some(AUTH_SECRETS[0].clone())],
+            chaff: false,
+        };
+        let external_inputs = prepare_external_inputs::<Fr>(&step_0_inputs);
+        let z_0 = get_z0::<Fr>();
+        dbg!(&z_0);
+
+        let z_0_bi = z_0
+            .iter()
+            .map(|val| ark_primefield_to_num_bigint(*val))
+            .collect::<Vec<BigInt>>();
+        let external_inputs_bi = external_inputs
+            .iter()
+            .map(|val| ark_primefield_to_num_bigint(*val))
+            .collect::<Vec<BigInt>>();
+
+        use ark_circom::{CircomBuilder, CircomConfig};
+        let cfg = CircomConfig::<Fr>::new(
+            "./circom/artifacts/grapevine.wasm",
+            "./circom/artifacts/grapevine.r1cs",
+        )
+        .unwrap();
+
+        let mut builder = CircomBuilder::new(cfg);
+
+        // Insert our public inputs as key value pairs
+        use std::collections::HashMap;
+        builder.inputs = HashMap::from([
+            ("ivc_input".to_string(), z_0_bi),
+            ("external_ipnuts".to_string(), external_inputs_bi),
+        ]);
+        dbg!(&builder.inputs);
+
+        let circom = builder.build().unwrap();
+
+        // extract the public output (ivc_output) from the computed witness and print it
+        let z_1 = circom.witness.unwrap()[1..1 + 6 + 4].to_vec();
+        println!("z_1: {:?}", z_1);
+    }
+
     #[test]
     fn test_step_native() {
         // define inputs
@@ -54,7 +109,8 @@ mod test {
         let external_inputs = prepare_external_inputs::<Fr>(&step_0_inputs);
 
         // initialize new Grapevine function circuit
-        let f_circuit = CircomFCircuit::<Fr>::new((R1CS_PATH.clone(), WASM_PATH.clone(), 4, 6 + 4)); // 4=ivc_input.lenght, 6+4=external_inputs
+        let f_circuit =
+            CircomFCircuit::<Fr>::new((R1CS_PATH.clone(), WASM_PATH.clone(), 4, 6 + 4)).unwrap(); // 4=ivc_input.lenght, 6+4=external_inputs
 
         let z_0 = get_z0();
         let z_1 = f_circuit
@@ -75,7 +131,8 @@ mod test {
         let external_inputs = prepare_external_inputs::<Fr>(&step_0_inputs);
 
         // initialize new Grapevine function circuit
-        let f_circuit = CircomFCircuit::<Fr>::new((R1CS_PATH.clone(), WASM_PATH.clone(), 4, 6 + 4)); // 4=ivc_input.lenght, 6+4=external_inputs
+        let f_circuit =
+            CircomFCircuit::<Fr>::new((R1CS_PATH.clone(), WASM_PATH.clone(), 4, 6 + 4)).unwrap(); // 4=ivc_input.lenght, 6+4=external_inputs
 
         let z_0 = get_z0();
         let z_1 = f_circuit
@@ -89,7 +146,6 @@ mod test {
             Vec::<FpVar<Fr>>::new_witness(cs.clone(), || Ok(external_inputs)).unwrap();
 
         // compute constraints for step 0
-        let cs = ConstraintSystem::<Fr>::new_ref();
         let z_1_var = f_circuit
             .generate_step_constraints(cs.clone(), 1, z_0_var, external_inputs_var)
             .unwrap();
